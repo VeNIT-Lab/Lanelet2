@@ -47,6 +47,12 @@ find_package(Boost REQUIRED COMPONENTS filesystem serialization)
 find_package(Eigen3 REQUIRED)
 find_package(pugixml REQUIRED)
 
+# Focal's pugixml (1.10) exports a plain "pugixml" target, not the
+# namespaced "pugixml::pugixml" that newer versions provide.
+if(NOT TARGET pugixml::pugixml)
+    add_library(pugixml::pugixml ALIAS pugixml)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "/usr/share/cmake/geographiclib")
 find_package(GeographicLib REQUIRED)
 
