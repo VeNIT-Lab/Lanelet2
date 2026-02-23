@@ -1,72 +1,83 @@
-set(MRT_PKG_VERSION 4.0.0)
-# Modify only if you know what you are doing!
-cmake_minimum_required(VERSION 3.5.1)
-project(lanelet2_python)
-
-###################
-## Find packages ##
-###################
-find_package(mrt_cmake_modules REQUIRED)
-include(UseMrtStdCompilerFlags)
-include(GatherDeps)
-
-# You can add a custom.cmake in order to add special handling for this package. E.g. you can do:
-# list(REMOVE_ITEM DEPENDEND_PACKAGES <package name 1> <package name 2> ...)
-# To remove libs which cannot be found automatically. You can also "find_package" other, custom dependencies there.
-# You can also set PROJECT_INSTALL_FILES to install files that are not installed by default.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/custom.cmake")
-    include("${CMAKE_CURRENT_SOURCE_DIR}/custom.cmake")
+if(NOT DEFINED LANELET2_SUPPRESS_WARNINGS)
+    set(LANELET2_SUPPRESS_WARNINGS
+            -Wno-deprecated-declarations
+            -Wno-unused-parameter
+            -Wno-sign-compare)
 endif()
 
-find_package(AutoDeps REQUIRED COMPONENTS ${DEPENDEND_PACKAGES})
-
-mrt_parse_package_xml()
-
-########################
-## Add python modules ##
-########################
-# This adds a python module if located under src/{PROJECT_NAME)
-mrt_python_module_setup()
-
-mrt_glob_files(PROJECT_PYTHON_SOURCE_FILES_SRC "python_api/*.cpp")
-if (PROJECT_PYTHON_SOURCE_FILES_SRC)
-    # Add a cpp-python api library. Make sure there are no name collisions with python modules in this project
-    mrt_add_python_api( lanelet2
-        FILES ${PROJECT_PYTHON_SOURCE_FILES_SRC}
-        )
-    _mrt_get_python_destination(PROJECT_PYTHON_DESTINATION)
-    mrt_glob_files(PROJECT_PYTHON_STUBS "typings/lanelet2/*.pyi")
-    install(FILES ${PROJECT_PYTHON_STUBS} DESTINATION ${PROJECT_PYTHON_DESTINATION}/lanelet2)
+if(NOT TARGET lanelet2_core OR NOT TARGET lanelet2_io OR NOT TARGET lanelet2_projection
+        OR NOT TARGET lanelet2_traffic_rules OR NOT TARGET lanelet2_routing)
+    message(
+            FATAL_ERROR
+            "lanelet2_python requires lanelet2_core, lanelet2_io, lanelet2_projection, lanelet2_traffic_rules and lanelet2_routing.")
 endif()
 
-############################
-## Read source code files ##
-############################
-mrt_glob_files_recurse(PROJECT_HEADER_FILES_INC "include/*.h" "include/*.hpp" "include/*.cuh")
-mrt_glob_files(PROJECT_SOURCE_FILES_INC "src/*.h" "src/*.hpp" "src/*.cuh")
-mrt_glob_files(PROJECT_SOURCE_FILES_SRC "src/*.cpp" "src/*.cu")
-
-###########
-## Build ##
-###########
-# Declare a cpp library
-mrt_add_library(${PROJECT_NAME}
-    INCLUDES ${PROJECT_HEADER_FILES_INC} ${PROJECT_SOURCE_FILES_INC}
-    SOURCES ${PROJECT_SOURCE_FILES_SRC}
-    )
-
-#############
-## Install ##
-#############
-# Install all targets, headers by default and scripts and other files if specified (folders or files).
-# This command also exports libraries and config files for dependent packages and this supersedes catkin_package.
-mrt_install(PROGRAMS scripts FILES res data ${PROJECT_INSTALL_FILES})
-
-#############
-## Testing ##
-#############
-# Add test targets for cpp and python tests
-if (CATKIN_ENABLE_TESTING)
-    mrt_add_tests(test)
-    mrt_add_nosetests(test)
+if(NOT TARGET lanelet2_matching)
+    message(FATAL_ERROR "lanelet2_python requires lanelet2_matching.")
 endif()
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+if(NOT DEFINED LANELET2_PYTHON_TARGET)
+    set(_lanelet2_boost_python_candidates
+            python${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}
+            python${Python3_VERSION_MAJOR}
+            python3
+            python)
+
+    unset(LANELET2_PYTHON_TARGET)
+    foreach(_component IN LISTS _lanelet2_boost_python_candidates)
+        if(NOT TARGET Boost::${_component})
+            find_package(Boost QUIET COMPONENTS ${_component})
+        endif()
+        if(TARGET Boost::${_component})
+            set(LANELET2_PYTHON_TARGET Boost::${_component})
+            break()
+        endif()
+    endforeach()
+endif()
+
+if(NOT DEFINED LANELET2_PYTHON_TARGET)
+    message(FATAL_ERROR "Could not find a usable Boost.Python target for lanelet2_python.")
+endif()
+
+file(GLOB LANELET2_PYTHON_SOURCES CONFIGURE_DEPENDS python_api/*.cpp)
+
+add_library(lanelet2_python MODULE ${LANELET2_PYTHON_SOURCES})
+set_target_properties(lanelet2_python PROPERTIES PREFIX "" OUTPUT_NAME lanelet2)
+
+target_include_directories(lanelet2_python PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(
+        lanelet2_python
+        PRIVATE lanelet2_core
+        lanelet2_io
+        lanelet2_projection
+        lanelet2_traffic_rules
+        lanelet2_routing
+        lanelet2_matching
+        ${LANELET2_PYTHON_TARGET}
+        Python3::Python
+        Boost::boost)
+target_compile_features(lanelet2_python PRIVATE cxx_std_14)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(lanelet2_python PRIVATE ${LANELET2_SUPPRESS_WARNINGS})
+endif()
+
+include(GNUInstallDirs)
+
+if(DEFINED Python3_SITEARCH AND NOT Python3_SITEARCH STREQUAL "")
+    set(_lanelet2_python_install_dir ${Python3_SITEARCH})
+elseif(DEFINED Python3_SITELIB AND NOT Python3_SITELIB STREQUAL "")
+    set(_lanelet2_python_install_dir ${Python3_SITELIB})
+else()
+    set(_lanelet2_python_install_dir
+            ${CMAKE_INSTALL_LIBDIR}/python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}/site-packages)
+endif()
+
+install(TARGETS lanelet2_python LIBRARY DESTINATION ${_lanelet2_python_install_dir})
+install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/typings/lanelet2/
+        DESTINATION ${_lanelet2_python_install_dir}/lanelet2
+        FILES_MATCHING
+        PATTERN "*.pyi")

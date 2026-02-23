@@ -1,59 +1,47 @@
-set(MRT_PKG_VERSION 4.0.0)
-# Modify only if you know what you are doing!
-cmake_minimum_required(VERSION 3.5.1)
-project(lanelet2_examples)
-
-###################
-## Find packages ##
-###################
-find_package(mrt_cmake_modules REQUIRED)
-include(UseMrtStdCompilerFlags)
-include(GatherDeps)
-
-# You can add a custom.cmake in order to add special handling for this package. E.g. you can do:
-# list(REMOVE_ITEM DEPENDEND_PACKAGES <package name 1> <package name 2> ...)
-# To remove libs which cannot be found automatically. You can also "find_package" other, custom dependencies there.
-# You can also set PROJECT_INSTALL_FILES to install files that are not installed by default.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/custom.cmake")
-    include("${CMAKE_CURRENT_SOURCE_DIR}/custom.cmake")
+if(NOT DEFINED LANELET2_SUPPRESS_WARNINGS)
+    set(LANELET2_SUPPRESS_WARNINGS
+            -Wno-deprecated-declarations
+            -Wno-unused-parameter
+            -Wno-sign-compare)
 endif()
 
-find_package(AutoDeps REQUIRED COMPONENTS ${DEPENDEND_PACKAGES})
-
-mrt_parse_package_xml()
-
-########################
-## Add python modules ##
-########################
-# This adds a python module if located under src/{PROJECT_NAME)
-mrt_python_module_setup()
-
-###########
-## Build ##
-###########
-glob_folders(SRC_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/src")
-if (SRC_DIRECTORIES)
-    # Found subfolders, add executable for each subfolder
-    foreach(SRC_DIR ${SRC_DIRECTORIES})
-        mrt_add_executable(${SRC_DIR} FOLDER "src/${SRC_DIR}")
-    endforeach()
-else()
-    # No subfolder found, add executable and python modules for src folder
-    mrt_add_executable(${PROJECT_NAME} FOLDER "src")
+if(NOT TARGET lanelet2_core OR NOT TARGET lanelet2_io OR NOT TARGET lanelet2_projection
+        OR NOT TARGET lanelet2_traffic_rules OR NOT TARGET lanelet2_routing)
+    message(
+            FATAL_ERROR
+            "lanelet2_examples requires lanelet2_core, lanelet2_io, lanelet2_projection, lanelet2_traffic_rules and lanelet2_routing.")
 endif()
 
-#############
-## Install ##
-#############
-# Install all targets, headers by default and scripts and other files if specified (folders or files).
-# This command also exports libraries and config files for dependent packages and this supersedes catkin_package.
-mrt_install(PROGRAMS scripts FILES res data ${PROJECT_INSTALL_FILES})
+file(GLOB LANELET2_EXAMPLE_MAINS CONFIGURE_DEPENDS src/*/main.cpp)
 
-#############
-## Testing ##
-#############
-# Add test targets for cpp and python tests
-if (CATKIN_ENABLE_TESTING)
-    mrt_add_tests(test)
-    mrt_add_nosetests(test)
-endif()
+include(GNUInstallDirs)
+foreach(_main IN LISTS LANELET2_EXAMPLE_MAINS)
+    get_filename_component(_example_dir "${_main}" DIRECTORY)
+    get_filename_component(_example_name "${_example_dir}" NAME)
+
+    if(_example_name STREQUAL "07_matching" AND NOT TARGET lanelet2_matching)
+        message(STATUS "Skipping lanelet2 example '07_matching' because lanelet2_matching is not built.")
+        continue()
+    endif()
+
+    set(_target lanelet2_example_${_example_name})
+    add_executable(${_target} ${_main})
+
+    target_include_directories(${_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(
+            ${_target}
+            PRIVATE lanelet2_core lanelet2_io lanelet2_projection lanelet2_traffic_rules lanelet2_routing)
+
+    if(TARGET lanelet2_matching)
+        target_link_libraries(${_target} PRIVATE lanelet2_matching)
+    endif()
+
+    target_compile_definitions(${_target} PRIVATE PKG_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_features(${_target} PRIVATE cxx_std_14)
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${_target} PRIVATE ${LANELET2_SUPPRESS_WARNINGS})
+    endif()
+
+    install(TARGETS ${_target} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endforeach()
