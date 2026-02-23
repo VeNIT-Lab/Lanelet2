@@ -1,69 +1,50 @@
-set(MRT_PKG_VERSION 4.0.0)
-# Modify only if you know what you are doing!
-cmake_minimum_required(VERSION 3.5.1)
-project(lanelet2_traffic_rules)
-
-###################
-## Find packages ##
-###################
-find_package(mrt_cmake_modules REQUIRED)
-include(UseMrtStdCompilerFlags)
-include(GatherDeps)
-
-# You can add a custom.cmake in order to add special handling for this package. E.g. you can do:
-# list(REMOVE_ITEM DEPENDEND_PACKAGES <package name 1> <package name 2> ...)
-# To remove libs which cannot be found automatically. You can also "find_package" other, custom dependencies there.
-# You can also set PROJECT_INSTALL_FILES to install files that are not installed by default.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/custom.cmake")
-    include("${CMAKE_CURRENT_SOURCE_DIR}/custom.cmake")
+if(NOT DEFINED LANELET2_LIB_TYPE)
+    option(LANELET2_SHARED_LIBS "Build lanelet2 as shared libraries (.so)" ON)
+    if(LANELET2_SHARED_LIBS)
+        set(LANELET2_LIB_TYPE SHARED)
+    else()
+        set(LANELET2_LIB_TYPE STATIC)
+    endif()
 endif()
 
-find_package(AutoDeps REQUIRED COMPONENTS ${DEPENDEND_PACKAGES})
-
-mrt_parse_package_xml()
-
-########################
-## Add python modules ##
-########################
-# This adds a python module if located under src/{PROJECT_NAME)
-mrt_python_module_setup()
-
-mrt_glob_files(PROJECT_PYTHON_SOURCE_FILES_SRC "python_api/*.cpp")
-if (PROJECT_PYTHON_SOURCE_FILES_SRC)
-    # Add a cpp-python api library. Make sure there are no name collisions with python modules in this project
-    mrt_add_python_api( ${PROJECT_NAME}
-        FILES ${PROJECT_PYTHON_SOURCE_FILES_SRC}
-        )
+if(NOT DEFINED LANELET2_SUPPRESS_WARNINGS)
+    set(LANELET2_SUPPRESS_WARNINGS
+            -Wno-deprecated-declarations
+            -Wno-unused-parameter
+            -Wno-sign-compare)
 endif()
 
-############################
-## Read source code files ##
-############################
-mrt_glob_files_recurse(PROJECT_HEADER_FILES_INC "include/*.h" "include/*.hpp" "include/*.cuh")
-mrt_glob_files(PROJECT_SOURCE_FILES_INC "src/*.h" "src/*.hpp" "src/*.cuh")
-mrt_glob_files(PROJECT_SOURCE_FILES_SRC "src/*.cpp" "src/*.cu")
-
-###########
-## Build ##
-###########
-# Declare a cpp library
-mrt_add_library(${PROJECT_NAME}
-    INCLUDES ${PROJECT_HEADER_FILES_INC} ${PROJECT_SOURCE_FILES_INC}
-    SOURCES ${PROJECT_SOURCE_FILES_SRC}
-    )
-
-#############
-## Install ##
-#############
-# Install all targets, headers by default and scripts and other files if specified (folders or files).
-# This command also exports libraries and config files for dependent packages and this supersedes catkin_package.
-mrt_install(PROGRAMS scripts FILES res data ${PROJECT_INSTALL_FILES})
-
-#############
-## Testing ##
-#############
-# Add test targets for cpp and python tests
-if (CATKIN_ENABLE_TESTING)
-    mrt_add_tests(test)
-    mrt_add_nosetests(test)
+if(NOT DEFINED LANELET2_EXPORT_SET)
+    set(LANELET2_EXPORT_SET lanelet2Targets)
 endif()
+
+if(NOT TARGET lanelet2_core)
+    message(FATAL_ERROR "lanelet2_traffic_rules requires lanelet2_core.")
+endif()
+
+file(GLOB LANELET2_TRAFFIC_RULES_SOURCES CONFIGURE_DEPENDS src/*.cpp)
+
+add_library(lanelet2_traffic_rules ${LANELET2_LIB_TYPE} ${LANELET2_TRAFFIC_RULES_SOURCES})
+add_library(lanelet2_traffic_rules::lanelet2_traffic_rules ALIAS lanelet2_traffic_rules)
+
+target_include_directories(
+        lanelet2_traffic_rules
+        PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>)
+
+target_link_libraries(lanelet2_traffic_rules PUBLIC lanelet2_core)
+target_compile_features(lanelet2_traffic_rules PUBLIC cxx_std_14)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(lanelet2_traffic_rules PRIVATE ${LANELET2_SUPPRESS_WARNINGS})
+endif()
+
+include(GNUInstallDirs)
+install(
+        TARGETS lanelet2_traffic_rules
+        EXPORT ${LANELET2_EXPORT_SET}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
