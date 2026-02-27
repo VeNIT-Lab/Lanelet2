@@ -1,0 +1,11 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+find_dependency(lanelet2_core)
+find_dependency(lanelet2_io)
+find_package(GeographicLib QUIET CONFIG)
+if(NOT GeographicLib_FOUND)
+    list(APPEND CMAKE_MODULE_PATH "/usr/share/cmake/geographiclib")
+    find_package(GeographicLib REQUIRED)
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/lanelet2_projectionTargets.cmake")
+check_required_components(lanelet2_projection)

@@ -14,10 +14,6 @@ if(NOT DEFINED LANELET2_SUPPRESS_WARNINGS)
             -Wno-sign-compare)
 endif()
 
-if(NOT DEFINED LANELET2_EXPORT_SET)
-    set(LANELET2_EXPORT_SET lanelet2Targets)
-endif()
-
 if(NOT TARGET lanelet2_core OR NOT TARGET lanelet2_traffic_rules)
     message(FATAL_ERROR "lanelet2_routing requires lanelet2_core and lanelet2_traffic_rules.")
 endif()
@@ -43,12 +39,41 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(lanelet2_routing PRIVATE ${LANELET2_SUPPRESS_WARNINGS})
 endif()
 
+set_target_properties(lanelet2_routing PROPERTIES SOVERSION 1 VERSION 1.3.0)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+set(_lanelet2_routing_cmake_dir "${CMAKE_INSTALL_LIBDIR}/cmake/lanelet2_routing")
+set(_lanelet2_routing_config_in "${CMAKE_CURRENT_SOURCE_DIR}/cmake/lanelet2_routingConfig.cmake.in")
+set(_lanelet2_routing_config "${CMAKE_CURRENT_BINARY_DIR}/lanelet2_routingConfig.cmake")
+set(_lanelet2_routing_config_version "${CMAKE_CURRENT_BINARY_DIR}/lanelet2_routingConfigVersion.cmake")
+
+configure_package_config_file(
+        "${_lanelet2_routing_config_in}"
+        "${_lanelet2_routing_config}"
+        INSTALL_DESTINATION "${_lanelet2_routing_cmake_dir}")
+
+write_basic_package_version_file(
+        "${_lanelet2_routing_config_version}"
+        VERSION 1.3.0
+        COMPATIBILITY SameMajorVersion)
+
 install(
         TARGETS lanelet2_routing
-        EXPORT ${LANELET2_EXPORT_SET}
+        EXPORT lanelet2_routingTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(
+        EXPORT lanelet2_routingTargets
+        FILE lanelet2_routingTargets.cmake
+        DESTINATION "${_lanelet2_routing_cmake_dir}")
+
+install(
+        FILES "${_lanelet2_routing_config}" "${_lanelet2_routing_config_version}"
+        DESTINATION "${_lanelet2_routing_cmake_dir}")
+
+install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

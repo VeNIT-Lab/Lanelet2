@@ -44,7 +44,7 @@ endif()
 file(GLOB LANELET2_PYTHON_SOURCES CONFIGURE_DEPENDS python_api/*.cpp)
 
 add_library(lanelet2_python MODULE ${LANELET2_PYTHON_SOURCES})
-set_target_properties(lanelet2_python PROPERTIES PREFIX "" OUTPUT_NAME lanelet2)
+set_target_properties(lanelet2_python PROPERTIES PREFIX "" OUTPUT_NAME lanelet2 SOVERSION 1 VERSION 1.3.0)
 
 target_include_directories(lanelet2_python PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(
