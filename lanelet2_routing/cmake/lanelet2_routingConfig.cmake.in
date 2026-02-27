@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+find_dependency(lanelet2_core)
+find_dependency(lanelet2_traffic_rules)
+find_dependency(Boost)
+include("${CMAKE_CURRENT_LIST_DIR}/lanelet2_routingTargets.cmake")
+check_required_components(lanelet2_routing)

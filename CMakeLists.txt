@@ -4,11 +4,30 @@ project(lanelet2_vendor LANGUAGES CXX)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(LANELET2_SHARED_LIBS "Build lanelet2 as shared libraries (.so)" ON)
+option(LANELET2_BUILD_CORE "Build lanelet2_core (required)" ON)
+option(LANELET2_BUILD_IO "Build lanelet2_io (required)" ON)
+option(LANELET2_BUILD_PROJECTION "Build lanelet2_projection (required)" ON)
+option(LANELET2_BUILD_TRAFFIC_RULES "Build lanelet2_traffic_rules (required)" ON)
+option(LANELET2_BUILD_ROUTING "Build lanelet2_routing (required)" ON)
 option(LANELET2_BUILD_MATCHING "Build lanelet2_matching" OFF)
 option(LANELET2_BUILD_VALIDATION "Build lanelet2_validation" OFF)
 option(LANELET2_BUILD_MAPS "Build/install lanelet2_maps assets" OFF)
 option(LANELET2_BUILD_EXAMPLES "Build lanelet2_examples executables" OFF)
 option(LANELET2_BUILD_PYTHON "Build lanelet2_python bindings" OFF)
+
+if(NOT LANELET2_BUILD_CORE
+        OR NOT LANELET2_BUILD_IO
+        OR NOT LANELET2_BUILD_PROJECTION
+        OR NOT LANELET2_BUILD_TRAFFIC_RULES
+        OR NOT LANELET2_BUILD_ROUTING)
+    message(
+            FATAL_ERROR
+            "lanelet2_vendor requires lanelet2_core, lanelet2_io, lanelet2_projection, lanelet2_traffic_rules and lanelet2_routing to be enabled.")
+endif()
+
+if(LANELET2_BUILD_PYTHON AND NOT LANELET2_BUILD_MATCHING)
+    message(FATAL_ERROR "lanelet2_python requires LANELET2_BUILD_MATCHING=ON.")
+endif()
 
 if(LANELET2_SHARED_LIBS)
     set(LANELET2_LIB_TYPE SHARED)
@@ -20,7 +39,6 @@ set(LANELET2_SUPPRESS_WARNINGS
         -Wno-deprecated-declarations
         -Wno-unused-parameter
         -Wno-sign-compare)
-set(LANELET2_EXPORT_SET lanelet2Targets)
 
 set(_lanelet2_boost_components filesystem serialization)
 if(LANELET2_BUILD_VALIDATION)
@@ -46,11 +64,25 @@ else()
     set(LANELET2_GEOGRAPHICLIB_INCLUDE_DIRS ${GeographicLib_INCLUDE_DIRS})
 endif()
 
-add_subdirectory(lanelet2_core)
-add_subdirectory(lanelet2_io)
-add_subdirectory(lanelet2_projection)
-add_subdirectory(lanelet2_traffic_rules)
-add_subdirectory(lanelet2_routing)
+if(LANELET2_BUILD_CORE)
+    add_subdirectory(lanelet2_core)
+endif()
+
+if(LANELET2_BUILD_IO)
+    add_subdirectory(lanelet2_io)
+endif()
+
+if(LANELET2_BUILD_PROJECTION)
+    add_subdirectory(lanelet2_projection)
+endif()
+
+if(LANELET2_BUILD_TRAFFIC_RULES)
+    add_subdirectory(lanelet2_traffic_rules)
+endif()
+
+if(LANELET2_BUILD_ROUTING)
+    add_subdirectory(lanelet2_routing)
+endif()
 
 if(LANELET2_BUILD_MATCHING)
     add_subdirectory(lanelet2_matching)
@@ -71,11 +103,5 @@ endif()
 if(LANELET2_BUILD_PYTHON)
     add_subdirectory(lanelet2_python)
 endif()
-
-include(GNUInstallDirs)
-install(
-        EXPORT ${LANELET2_EXPORT_SET}
-        NAMESPACE lanelet2_
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/lanelet2)
 
 message(STATUS "lanelet2: modular plain CMake build (ROS/mrt free)")

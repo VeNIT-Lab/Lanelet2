@@ -1,0 +1,5 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+find_dependency(lanelet2_core)
+include("${CMAKE_CURRENT_LIST_DIR}/lanelet2_traffic_rulesTargets.cmake")
+check_required_components(lanelet2_traffic_rules)
